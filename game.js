@@ -1,3 +1,4 @@
+// ------------------ Player & Game Variables ------------------
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
@@ -25,7 +26,7 @@ let enemies = [];
 
 const baseEnemyHP = 3;
 
-// 🎮 Controls
+// ------------------ Controls ------------------
 let shooting = false;
 
 document.addEventListener("keydown", e => {
@@ -41,7 +42,7 @@ document.addEventListener("mousemove", e => {
   player.x = e.clientX - rect.left - player.width / 2;
 });
 
-// 🔫 Shooting loop
+// ------------------ Shooting ------------------
 setInterval(() => {
   if (!shooting) return;
 
@@ -50,42 +51,42 @@ setInterval(() => {
   sideShips.forEach(s => {
     bullets.push({ x: s.x + 10, y: s.y });
   });
-}, 250);
+}, 80); // Fast shooting
 
-// 👾 Enemy spawner
+// ------------------ Enemy Spawning ------------------
 function spawnWave() {
   enemies = [];
 
+  if (wave > maxWaves) return;
+
+  // Boss
   if (wave === maxWaves) {
-    // BOSS
     enemies.push({
-      x: 250,
-      y: -40,
-      width: 100,
-      height: 40,
-      hp: baseEnemyHP * 2 * 2 * 3,
+      x: 200,
+      y: 50,
+      width: 120,
+      height: 50,
+      hp: baseEnemyHP * 12, // 3x Ultra
       type: "boss"
     });
     return;
   }
 
-  for (let i = 0; i < wave + 2; i++) {
+  for (let i = 0; i < wave + 3; i++) {
     let type = "normal";
     let hp = baseEnemyHP;
 
-    if (wave >= 5 && Math.random() < 0.3) {
+    if (wave >= 10 && Math.random() < 0.25) {
+      type = "ultra";
+      hp *= 4;
+    } else if (wave >= 5 && Math.random() < 0.35) {
       type = "super";
       hp *= 2;
     }
 
-    if (wave >= 10 && Math.random() < 0.2) {
-      type = "ultra";
-      hp *= 4;
-    }
-
     enemies.push({
-      x: Math.random() * 560,
-      y: -Math.random() * 300,
+      x: Math.random() * (canvas.width - 30),
+      y: Math.random() * 150,
       width: 30,
       height: 20,
       hp,
@@ -94,16 +95,15 @@ function spawnWave() {
   }
 }
 
-spawnWave();
-
+// ------------------ Game Update Loop ------------------
 function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 🚀 Player
+  // --- Player ---
   ctx.fillStyle = "cyan";
   ctx.fillRect(player.x, player.y, player.width, player.height);
 
-  // 🚀 Side ships
+  // --- Side Ships ---
   sideShips.forEach((s, i) => {
     s.x = player.x + (i % 2 === 0 ? -50 : 50);
     s.y = player.y;
@@ -111,7 +111,7 @@ function update() {
     ctx.fillRect(s.x, s.y, 20, 15);
   });
 
-  // 🔫 Bullets
+  // --- Bullets ---
   ctx.fillStyle = "yellow";
   bullets.forEach((b, i) => {
     b.y -= 6;
@@ -119,7 +119,7 @@ function update() {
     if (b.y < 0) bullets.splice(i, 1);
   });
 
-  // 👾 Enemies
+  // --- Enemies ---
   enemies.forEach(e => {
     e.y += e.type === "boss" ? 0.5 : 1.5;
 
@@ -131,7 +131,7 @@ function update() {
     ctx.fillRect(e.x, e.y, e.width, e.height);
   });
 
-  // 💥 Collisions
+  // --- Collisions ---
   bullets.forEach((b, bi) => {
     enemies.forEach((e, ei) => {
       if (
@@ -151,12 +151,13 @@ function update() {
     });
   });
 
-  // 🌊 Next wave
+  // --- Next Wave ---
   if (enemies.length === 0) {
     wave++;
     if (wave <= maxWaves) spawnWave();
   }
 
+  // --- HUD ---
   hud.innerText = `
 Coins: ${coins}
 Income Multiplier: x${incomeMult}
@@ -169,7 +170,7 @@ Side Ships: ${sideShips.length}
 
 update();
 
-// 🛒 Upgrades
+// ------------------ Upgrades ------------------
 function buyUpgrade() {
   if (coins >= upgradeCost) {
     coins -= upgradeCost;
@@ -190,5 +191,13 @@ function buyIncome() {
     coins -= incomeCost;
     incomeMult *= 2;
     incomeCost *= 3;
+  }
+}
+
+function buyLaser() {
+  if (coins >= 300) {
+    coins -= 300;
+    alert("Laser upgrade activated! (Placeholder)");
+    // You can implement laser shooting logic here later
   }
 }
