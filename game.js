@@ -1,15 +1,74 @@
-// ------------------ Canvas Setup ------------------
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Patron Mo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #000;
+      color: #fff;
+    }
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    canvas {
+      background-color: #111;
+      margin-top: 10px;
+      border: 2px solid #fff;
+    }
+    .buttons { margin-top: 10px; }
+  </style>
+</head>
+<body>
+<h1>🚀 Space Shooter</h1>
+
+<!-- Spawn Screen -->
+<div id="spawnScreen">
+  <h2>Select a Realm</h2>
+  <button onclick="openRealm(1)">Realm 1</button>
+</div>
+
+<!-- Dungeon Screen -->
+<div id="dungeonScreen" style="display:none;">
+  <h2>Realm 1 - Select a Dungeon</h2>
+  <button onclick="startDungeon('Easy')">Easy</button>
+  <button disabled>Medium</button>
+  <button disabled>Hard</button>
+  <button disabled>Extreme</button>
+  <button disabled>Nightmare</button>
+</div>
+
+<!-- HUD and buttons -->
+<p id="hud" style="display:none;"></p>
+<div class="buttons" style="display:none;">
+  <button id="upgradeBtn" onclick="buyUpgrade()">Upgrade Damage</button>
+  <button id="sideShipBtn" onclick="buySideShip()">Buy Side Ship</button>
+  <button id="incomeBtn" onclick="buyIncome()">Double Income</button>
+  <button id="laserBtn" onclick="buyLaser()">Buy Laser</button>
+  <button id="skipBtn" onclick="skipWave()">Skip Wave</button>
+</div>
+
+<!-- Game Canvas -->
+<canvas id="game" width="600" height="400" style="display:none;"></canvas>
+
+<script>
+// ------------------ Game Variables ------------------
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
 
-// ------------------ Player Stats ------------------
 let coins = 0;
 let incomeMult = 1;
 let incomeCost = 50;
 
 let damage = 1;
 let upgradeCost = 10;
+let damageUpgradesBought = 0;
 
 let wave = 1;
 const maxWaves = 15;
@@ -17,19 +76,10 @@ const maxWaves = 15;
 let hearts = 5;
 const maxHearts = 5;
 
-// ------------------ Player ------------------
-const player = {
-  x: 280,
-  y: 350,
-  width: 40,
-  height: 20,
-  speed: 4
-};
-
+const player = { x:280, y:350, width:40, height:20, speed:4 };
 let keys = {};
 let shooting = false;
 
-// ------------------ Entities ------------------
 let sideShips = [];
 let bullets = [];
 let enemies = [];
@@ -38,180 +88,137 @@ let heartDrops = [];
 const baseEnemyHP = 3;
 const enemiesPerWave = 5;
 
-// ------------------ Controls ------------------
-document.addEventListener("keydown", e => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.code === "Space") shooting = true;
-});
+let waveTimer = 0;
+const waveDelay = 10800; // 3 min at 60fps
 
-document.addEventListener("keyup", e => {
-  keys[e.key.toLowerCase()] = false;
-  if (e.code === "Space") shooting = false;
-});
+// ------------------ Controls ------------------
+document.addEventListener("keydown", e => { keys[e.key.toLowerCase()] = true; if(e.code==="Space") shooting=true; });
+document.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; if(e.code==="Space") shooting=false; });
 
 // ------------------ Shooting ------------------
-setInterval(() => {
-  if (!shooting) return;
-
-  bullets.push({ x: player.x + 18, y: player.y });
-
-  sideShips.forEach(s => {
-    bullets.push({ x: s.x + 10, y: s.y });
-  });
-}, 120);
+setInterval(()=>{
+  if(!shooting) return;
+  bullets.push({x:player.x+18,y:player.y});
+  sideShips.forEach(s => bullets.push({x:s.x+10,y:s.y}));
+},120);
 
 // ------------------ Enemy Spawning ------------------
 function spawnWave() {
-  if (wave > maxWaves) return;
+  enemies = [];
+  if(wave > maxWaves) return;
+  coins += 20;
 
-  coins += 20; // give 20 coins each wave
-
-  for (let i = 0; i < enemiesPerWave + wave; i++) {
-    let type = "normal";
-    let hp = baseEnemyHP;
-
-    if (wave >= 10 && Math.random() < 0.25) {
-      type = "ultra";
-      hp *= 4;
-    } else if (wave >= 5 && Math.random() < 0.35) {
-      type = "super";
-      hp *= 2;
-    }
-
+  if(wave === maxWaves){ // Boss
     enemies.push({
-      x: Math.random() * (canvas.width - 30),
-      y: -Math.random() * 200,
-      width: 30,
-      height: 20,
-      hp,
-      type,
-      speed: 0.6 // slower enemies
+      x: 200,
+      y: -50,
+      width: 120,
+      height: 50,
+      hp: baseEnemyHP*12,
+      type: "boss",
+      speed: 0.3
     });
+    return;
+  }
+
+  for(let i=0;i<enemiesPerWave+wave;i++){
+    let type="normal", hp=baseEnemyHP;
+    if(wave>=10 && Math.random()<0.25){ type="ultra"; hp*=4; }
+    else if(wave>=5 && Math.random()<0.35){ type="super"; hp*=2; }
+    enemies.push({ x:Math.random()*(canvas.width-30), y:-Math.random()*200, width:30, height:20, hp, type, speed:0.6 });
   }
 }
 
-// ------------------ Movement ------------------
-function movePlayer() {
-  if (keys["a"]) player.x -= player.speed;
-  if (keys["d"]) player.x += player.speed;
-  if (keys["w"]) player.y -= player.speed;
-  if (keys["s"]) player.y += player.speed;
-
-  // Boundaries
-  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-  player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+// ------------------ Player Movement ------------------
+function movePlayer(){
+  if(keys["a"]) player.x-=player.speed;
+  if(keys["d"]) player.x+=player.speed;
+  if(keys["w"]) player.y-=player.speed;
+  if(keys["s"]) player.y+=player.speed;
+  player.x=Math.max(0,Math.min(canvas.width-player.width,player.x));
+  player.y=Math.max(0,Math.min(canvas.height-player.height,player.y));
 }
 
-// ------------------ Wave Timer ------------------
-let waveTimer = 0;
-const waveDelay = 600; // frames (~10s at 60fps)
-spawnWave(); // Spawn first wave immediately
-
 // ------------------ Skip Wave ------------------
-function skipWave() {
-  wave++;
-  if (wave <= maxWaves) spawnWave();
+function skipWave(){
+  if(enemies.length <= 2){
+    wave++;
+    waveTimer=0;
+    spawnWave();
+  } else {
+    alert("You can only skip the wave when 2 or fewer enemies remain!");
+  }
 }
 
 // ------------------ Game Loop ------------------
-function update() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+function update(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   movePlayer();
 
-  // --- Player ---
-  ctx.fillStyle = "cyan";
-  ctx.fillRect(player.x, player.y, player.width, player.height);
+  // Player
+  ctx.fillStyle="cyan"; ctx.fillRect(player.x,player.y,player.width,player.height);
 
-  // --- Side Ships ---
-  sideShips.forEach((s, i) => {
-    s.x = player.x + (i % 2 === 0 ? -50 : 50);
-    s.y = player.y;
-    ctx.fillStyle = "lightblue";
-    ctx.fillRect(s.x, s.y, 20, 15);
+  // Side Ships
+  sideShips.forEach((s,i)=>{
+    s.x=player.x+(i%2===0?-50:50);
+    s.y=player.y;
+    ctx.fillStyle="lightblue"; ctx.fillRect(s.x,s.y,20,15);
   });
 
-  // --- Bullets ---
-  ctx.fillStyle = "yellow";
-  bullets.forEach((b, i) => {
-    b.y -= 6;
-    ctx.fillRect(b.x, b.y, 4, 10);
-    if (b.y < 0) bullets.splice(i, 1);
+  // Bullets
+  ctx.fillStyle="yellow";
+  bullets.forEach((b,i)=>{
+    b.y-=6;
+    ctx.fillRect(b.x,b.y,4,10);
+    if(b.y<0) bullets.splice(i,1);
   });
 
-  // --- Enemies ---
-  enemies.forEach((e, i) => {
-    e.y += e.speed;
-
-    if (e.type === "ultra") ctx.fillStyle = "purple";
-    else if (e.type === "super") ctx.fillStyle = "orange";
-    else ctx.fillStyle = "pink";
-
-    ctx.fillRect(e.x, e.y, e.width, e.height);
-
-    // If enemy reaches bottom → lose a heart
-    if (e.y > canvas.height) {
-      enemies.splice(i, 1);
-      hearts--;
-      if (hearts <= 0) {
-        alert("Game Over!");
-        location.reload();
-      }
-    }
+  // Enemies
+  enemies.forEach((e,i)=>{
+    e.y+=e.speed;
+    ctx.fillStyle = e.type==="boss"?"red":e.type==="ultra"?"purple":e.type==="super"?"orange":"pink";
+    ctx.fillRect(e.x,e.y,e.width,e.height);
+    if(e.y>canvas.height){ enemies.splice(i,1); hearts--; if(hearts<=0){ alert("Game Over!"); location.reload(); } }
   });
 
-  // --- Bullet Collisions ---
-  bullets.forEach((b, bi) => {
-    enemies.forEach((e, ei) => {
-      if (
-        b.x < e.x + e.width &&
-        b.x + 4 > e.x &&
-        b.y < e.y + e.height &&
-        b.y + 10 > e.y
-      ) {
-        e.hp -= damage;
-        bullets.splice(bi, 1);
-
-        if (e.hp <= 0) {
-          // 5% chance for heart drop
-          if (Math.random() < 0.05) {
-            heartDrops.push({ x: e.x, y: e.y, size: 15 });
-          }
-
-          enemies.splice(ei, 1);
-          coins += 1 * incomeMult;
+  // Bullet collisions
+  bullets.forEach((b,bi)=>{
+    enemies.forEach((e,ei)=>{
+      if(b.x<e.x+e.width && b.x+4>e.x && b.y<e.y+e.height && b.y+10>e.y){
+        e.hp-=damage;
+        bullets.splice(bi,1);
+        if(e.hp<=0){
+          if(Math.random()<0.05){ heartDrops.push({x:e.x,y:e.y,size:15}); }
+          enemies.splice(ei,1);
+          coins+=1*incomeMult;
         }
       }
     });
   });
 
-  // --- Heart Drops ---
-  heartDrops.forEach((h, i) => {
-    h.y += 1;
-    ctx.fillStyle = "red";
-    ctx.fillRect(h.x, h.y, h.size, h.size);
-
-    // Pickup
-    if (
-      h.x < player.x + player.width &&
-      h.x + h.size > player.x &&
-      h.y < player.y + player.height &&
-      h.y + h.size > player.y
-    ) {
-      if (hearts < maxHearts) hearts++;
-      heartDrops.splice(i, 1);
+  // Heart drops
+  heartDrops.forEach((h,i)=>{
+    h.y+=1;
+    ctx.fillStyle="red"; ctx.fillRect(h.x,h.y,h.size,h.size);
+    if(h.x<player.x+player.width && h.x+h.size>player.x && h.y<player.y+player.height && h.y+h.size>player.y){
+      if(hearts<maxHearts) hearts++;
+      heartDrops.splice(i,1);
     }
   });
 
-  // --- Wave Timer ---
+  // Wave Timer
   waveTimer++;
-  if (waveTimer >= waveDelay) {
-    waveTimer = 0;
+  if(waveTimer>=waveDelay){
+    waveTimer=0;
     wave++;
-    if (wave <= maxWaves) spawnWave();
+    if(wave <= maxWaves) spawnWave();
+    else returnToMenu();
   }
 
-  // --- HUD ---
+  // If wave cleared early and wave 15 completed
+  if(wave > maxWaves) returnToMenu();
+
+  // HUD
   hud.innerText = `
 Coins: ${coins}
 Wave: ${wave}/${maxWaves}
@@ -220,38 +227,75 @@ Side Ships: ${sideShips.length}
 Hearts: ${"❤️".repeat(hearts)}
 `;
 
+  // Button costs
+  document.getElementById("upgradeBtn").innerText = `Upgrade Damage (${upgradeCost})`;
+  document.getElementById("sideShipBtn").innerText = `Buy Side Ship (50)`;
+  document.getElementById("incomeBtn").innerText = `Double Income (${incomeCost})`;
+  document.getElementById("laserBtn").innerText = `Buy Laser (300)`;
+
   requestAnimationFrame(update);
 }
 
-update();
+// ------------------ Return to Menu ------------------
+function returnToMenu(){
+  alert("Congratulations! You completed all waves!");
+  document.querySelectorAll(".buttons, #hud").forEach(el=>el.style.display="none");
+  canvas.style.display="none";
+  spawnScreen.style.display="block";
+  resetGame();
+}
+
+// ------------------ Reset Game ------------------
+function resetGame(){
+  coins = 0; incomeMult=1; incomeCost=50;
+  damage=1; upgradeCost=10; damageUpgradesBought=0;
+  hearts=maxHearts;
+  wave=1; waveTimer=0;
+  bullets=[]; enemies=[]; heartDrops=[]; sideShips=[];
+}
 
 // ------------------ Upgrades ------------------
-function buyUpgrade() {
-  if (coins >= upgradeCost) {
-    coins -= upgradeCost;
+function buyUpgrade(){
+  if(coins>=upgradeCost){
+    coins-=upgradeCost;
     damage++;
-    upgradeCost = Math.floor(upgradeCost * 3.5);
+    damageUpgradesBought++;
+    if(damageUpgradesBought>5) upgradeCost*=4;
+    else upgradeCost=Math.floor(upgradeCost*3.5);
   }
 }
 
-function buySideShip() {
-  if (coins >= 50) {
-    coins -= 50;
-    sideShips.push({ x: 0, y: 0 });
-  }
+function buySideShip(){
+  if(coins>=50 && sideShips.length<2){ coins-=50; sideShips.push({x:0,y:0}); }
+  else if(sideShips.length>=2){ alert("Max 2 side ships!"); }
 }
 
-function buyIncome() {
-  if (coins >= incomeCost) {
-    coins -= incomeCost;
-    incomeMult *= 2;
-    incomeCost *= 3;
-  }
+function buyIncome(){ if(coins>=incomeCost){ coins-=incomeCost; incomeMult*=2; incomeCost*=3; } }
+function buyLaser(){ if(coins>=300){ coins-=300; alert("Laser coming soon!"); } }
+
+// ------------------ Spawn/Dungeon Screens ------------------
+const spawnScreen = document.getElementById("spawnScreen");
+const dungeonScreen = document.getElementById("dungeonScreen");
+const gameCanvas = document.getElementById("game");
+
+document.querySelectorAll(".buttons, #hud").forEach(el=>el.style.display="none");
+gameCanvas.style.display="none";
+
+function openRealm(realmNumber){
+  spawnScreen.style.display="none";
+  dungeonScreen.style.display="block";
 }
 
-function buyLaser() {
-  if (coins >= 300) {
-    coins -= 300;
-    alert("Laser upgrade coming soon!");
-  }
+function startDungeon(dungeonName){
+  dungeonScreen.style.display="none";
+  gameCanvas.style.display="block";
+  document.querySelectorAll(".buttons, #hud").forEach(el=>el.style.display="block");
+  resetGame();
+  spawnWave();
 }
+
+spawnWave();
+update();
+</script>
+</body>
+</html>
