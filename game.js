@@ -1,8 +1,9 @@
-// ------------------ Player & Game Variables ------------------
+// ------------------ Canvas Setup ------------------
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
 
+// ------------------ Player Stats ------------------
 let coins = 0;
 let incomeMult = 1;
 let incomeCost = 50;
@@ -13,33 +14,39 @@ let upgradeCost = 10;
 let wave = 1;
 const maxWaves = 15;
 
+let hearts = 5;
+let maxHearts = 5;
+
+// ------------------ Player ------------------
 const player = {
   x: 280,
   y: 350,
   width: 40,
-  height: 20
+  height: 20,
+  speed: 4
 };
 
+let keys = {};
+let shooting = false;
+
+// ------------------ Entities ------------------
 let sideShips = [];
 let bullets = [];
 let enemies = [];
+let heartDrops = [];
 
 const baseEnemyHP = 3;
+const enemiesPerWave = 5;
 
 // ------------------ Controls ------------------
-let shooting = false;
-
 document.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
   if (e.code === "Space") shooting = true;
 });
 
 document.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
   if (e.code === "Space") shooting = false;
-});
-
-document.addEventListener("mousemove", e => {
-  const rect = canvas.getBoundingClientRect();
-  player.x = e.clientX - rect.left - player.width / 2;
 });
 
 // ------------------ Shooting ------------------
@@ -51,28 +58,13 @@ setInterval(() => {
   sideShips.forEach(s => {
     bullets.push({ x: s.x + 10, y: s.y });
   });
-}, 80); // Fast shooting
+}, 120);
 
 // ------------------ Enemy Spawning ------------------
 function spawnWave() {
-  enemies = [];
-
   if (wave > maxWaves) return;
 
-  // Boss
-  if (wave === maxWaves) {
-    enemies.push({
-      x: 200,
-      y: 50,
-      width: 120,
-      height: 50,
-      hp: baseEnemyHP * 12, // 3x Ultra
-      type: "boss"
-    });
-    return;
-  }
-
-  for (let i = 0; i < wave + 3; i++) {
+  for (let i = 0; i < enemiesPerWave + wave; i++) {
     let type = "normal";
     let hp = baseEnemyHP;
 
@@ -86,18 +78,33 @@ function spawnWave() {
 
     enemies.push({
       x: Math.random() * (canvas.width - 30),
-      y: Math.random() * 150,
+      y: -Math.random() * 200,
       width: 30,
       height: 20,
       hp,
-      type
+      type,
+      speed: 0.6 // slower enemies
     });
   }
 }
 
-// ------------------ Game Update Loop ------------------
+// ------------------ Movement ------------------
+function movePlayer() {
+  if (keys["a"]) player.x -= player.speed;
+  if (keys["d"]) player.x += player.speed;
+  if (keys["w"]) player.y -= player.speed;
+  if (keys["s"]) player.y += player.speed;
+
+  // Boundaries
+  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+  player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+}
+
+// ------------------ Game Loop ------------------
 function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  movePlayer();
 
   // --- Player ---
   ctx.fillStyle = "cyan";
@@ -120,18 +127,28 @@ function update() {
   });
 
   // --- Enemies ---
-  enemies.forEach(e => {
-    e.y += e.type === "boss" ? 0.5 : 1.5;
+  enemies.forEach((e, i) => {
+    e.y += e.speed;
 
-    if (e.type === "boss") ctx.fillStyle = "red";
-    else if (e.type === "ultra") ctx.fillStyle = "purple";
+    if (e.type === "ultra") ctx.fillStyle = "purple";
     else if (e.type === "super") ctx.fillStyle = "orange";
     else ctx.fillStyle = "pink";
 
     ctx.fillRect(e.x, e.y, e.width, e.height);
+
+    // If enemy reaches bottom → explode & lose heart
+    if (e.y > canvas.height) {
+      enemies.splice(i, 1);
+      hearts--;
+
+      if (hearts <= 0) {
+        alert("Game Over!");
+        location.reload();
+      }
+    }
   });
 
-  // --- Collisions ---
+  // --- Bullet Collisions ---
   bullets.forEach((b, bi) => {
     enemies.forEach((e, ei) => {
       if (
@@ -144,6 +161,11 @@ function update() {
         bullets.splice(bi, 1);
 
         if (e.hp <= 0) {
+          // 5% heart drop
+          if (Math.random() < 0.05) {
+            heartDrops.push({ x: e.x, y: e.y, size: 15 });
+          }
+
           enemies.splice(ei, 1);
           coins += 1 * incomeMult;
         }
@@ -151,23 +173,37 @@ function update() {
     });
   });
 
-  // --- Next Wave ---
-  if (enemies.length === 0) {
-    wave++;
-    if (wave <= maxWaves) spawnWave();
-  }
+  // --- Heart Drops ---
+  heartDrops.forEach((h, i) => {
+    h.y += 1;
+    ctx.fillStyle = "red";
+    ctx.fillRect(h.x, h.y, h.size, h.size);
+
+    // Pickup
+    if (
+      h.x < player.x + player.width &&
+      h.x + h.size > player.x &&
+      h.y < player.y + player.height &&
+      h.y + h.size > player.y
+    ) {
+      if (hearts < maxHearts) hearts++;
+      heartDrops.splice(i, 1);
+    }
+  });
 
   // --- HUD ---
   hud.innerText = `
 Coins: ${coins}
-Income Multiplier: x${incomeMult}
 Wave: ${wave}/${maxWaves}
 Damage: ${damage}
 Side Ships: ${sideShips.length}
+Hearts: ${"❤️".repeat(hearts)}
 `;
+
   requestAnimationFrame(update);
 }
 
+spawnWave();
 update();
 
 // ------------------ Upgrades ------------------
@@ -197,7 +233,6 @@ function buyIncome() {
 function buyLaser() {
   if (coins >= 300) {
     coins -= 300;
-    alert("Laser upgrade activated! (Placeholder)");
-    // You can implement laser shooting logic here later
+    alert("Laser upgrade coming soon!");
   }
 }
