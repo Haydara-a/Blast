@@ -15,7 +15,7 @@ let wave = 1;
 const maxWaves = 15;
 
 let hearts = 5;
-let maxHearts = 5;
+const maxHearts = 5;
 
 // ------------------ Player ------------------
 const player = {
@@ -64,6 +64,8 @@ setInterval(() => {
 function spawnWave() {
   if (wave > maxWaves) return;
 
+  coins += 20; // give 20 coins each wave
+
   for (let i = 0; i < enemiesPerWave + wave; i++) {
     let type = "normal";
     let hp = baseEnemyHP;
@@ -98,6 +100,17 @@ function movePlayer() {
   // Boundaries
   player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
   player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+}
+
+// ------------------ Wave Timer ------------------
+let waveTimer = 0;
+const waveDelay = 600; // frames (~10s at 60fps)
+spawnWave(); // Spawn first wave immediately
+
+// ------------------ Skip Wave ------------------
+function skipWave() {
+  wave++;
+  if (wave <= maxWaves) spawnWave();
 }
 
 // ------------------ Game Loop ------------------
@@ -136,11 +149,10 @@ function update() {
 
     ctx.fillRect(e.x, e.y, e.width, e.height);
 
-    // If enemy reaches bottom → explode & lose heart
+    // If enemy reaches bottom → lose a heart
     if (e.y > canvas.height) {
       enemies.splice(i, 1);
       hearts--;
-
       if (hearts <= 0) {
         alert("Game Over!");
         location.reload();
@@ -161,7 +173,7 @@ function update() {
         bullets.splice(bi, 1);
 
         if (e.hp <= 0) {
-          // 5% heart drop
+          // 5% chance for heart drop
           if (Math.random() < 0.05) {
             heartDrops.push({ x: e.x, y: e.y, size: 15 });
           }
@@ -191,6 +203,14 @@ function update() {
     }
   });
 
+  // --- Wave Timer ---
+  waveTimer++;
+  if (waveTimer >= waveDelay) {
+    waveTimer = 0;
+    wave++;
+    if (wave <= maxWaves) spawnWave();
+  }
+
   // --- HUD ---
   hud.innerText = `
 Coins: ${coins}
@@ -203,7 +223,6 @@ Hearts: ${"❤️".repeat(hearts)}
   requestAnimationFrame(update);
 }
 
-spawnWave();
 update();
 
 // ------------------ Upgrades ------------------
