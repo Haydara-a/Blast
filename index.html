@@ -1,24 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Space Shooter</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>🚀 Space Shooter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #000;
+      color: #fff;
+    }
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    canvas {
+      background-color: #111;
+      margin-top: 10px;
+      border: 2px solid #fff;
+    }
+  </style>
 </head>
 <body>
   <h1>🚀 Space Shooter</h1>
-  <p id="hud"></p>
 
-  <div class="buttons">
-    <button onclick="buyUpgrade()">Upgrade Damage</button>
-    <button onclick="buySideShip()">Buy Side Ship (50 coins)</button>
-    <button onclick="buyLaser()">Buy Laser (300 coins)</button>
+  <!-- Spawn Screen -->
+  <div id="spawnScreen">
+    <h2>Select a Realm</h2>
+    <button onclick="openRealm(1)">Realm 1</button>
   </div>
 
-  <canvas id="game" width="600" height="400"></canvas>
+  <!-- Dungeon Screen -->
+  <div id="dungeonScreen" style="display:none;">
+    <h2>Realm 1 - Select a Dungeon</h2>
+    <button onclick="startDungeon('Easy')">Easy</button>
+    <button disabled>Medium</button>
+    <button disabled>Hard</button>
+    <button disabled>Extreme</button>
+    <button disabled>Nightmare</button>
+  </div>
 
+  <!-- Game HUD and Buttons -->
+  <p id="hud" style="display:none;"></p>
+  <div class="buttons" style="display:none;">
+    <button onclick="buyUpgrade()">Upgrade Damage</button>
+    <button onclick="buySideShip()">Buy Side Ship</button>
+    <button onclick="buyIncome()">Double Income</button>
+    <button onclick="buyLaser()">Buy Laser</button>
+  </div>
+
+  <!-- Game Canvas -->
+  <canvas id="game" width="600" height="400" style="display:none;"></canvas>
+
+  <!-- Scripts -->
   <script src="game.js"></script>
+  <script>
+    // --- Spawn & Dungeon screens ---
+    const spawnScreen = document.getElementById("spawnScreen");
+    const dungeonScreen = document.getElementById("dungeonScreen");
+    const gameCanvas = document.getElementById("game");
+
+    let currentDungeon = "";
+
+    // Hide game elements at start
+    document.querySelectorAll(".buttons, #hud").forEach(el => el.style.display = "none");
+    gameCanvas.style.display = "none";
+
+    // Open Realm → shows dungeon buttons
+    function openRealm(realmNumber) {
+      spawnScreen.style.display = "none";
+      dungeonScreen.style.display = "block";
+    }
+
+    // Start the dungeon → shows game canvas and HUD
+    function startDungeon(dungeonName) {
+      currentDungeon = dungeonName;
+      dungeonScreen.style.display = "none";
+      gameCanvas.style.display = "block";
+      document.querySelectorAll(".buttons, #hud").forEach(el => el.style.display = "block");
+
+      // Reset game variables (this will be connected to your game.js)
+      if (typeof wave !== "undefined") wave = 1;
+      if (typeof coins !== "undefined") coins = 0;
+      if (typeof incomeMult !== "undefined") incomeMult = 1;
+      if (typeof sideShips !== "undefined") sideShips = [];
+      if (typeof enemies !== "undefined") enemies = [];
+      if (typeof bullets !== "undefined") bullets = [];
+      if (typeof spawnWave === "function") spawnWave();
+    }
+  </script>
 </body>
 </html>
-<button onclick="buyIncome()">Double Income</button>
-
