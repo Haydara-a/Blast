@@ -4,87 +4,106 @@
 <meta charset="UTF-8">
 <title>Patron Mo</title>
 <style>
-body { font-family: Arial, sans-serif; text-align: center; background-color: #000; color: #fff; }
-button { margin: 5px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
-canvas { background-color: #111; margin-top: 10px; border: 2px solid #fff; }
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background-color: #000;
+  color: #fff;
+}
+button {
+  margin: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+canvas {
+  background-color: #111;
+  margin-top: 10px;
+  border: 2px solid #fff;
+}
 .buttons { margin-top: 10px; }
+
+#leaderboard {
+  margin-top: 20px;
+}
 </style>
 </head>
 <body>
+
 <h1>🚀 Space Shooter</h1>
 
-<!-- Spawn Screen -->
 <div id="spawnScreen">
   <h2>Select a Realm</h2>
   <button onclick="openRealm(1)">Realm 1</button>
 </div>
 
-<!-- Dungeon Screen -->
 <div id="dungeonScreen" style="display:none;">
   <h2>Realm 1 - Select a Dungeon</h2>
   <button onclick="startDungeon('Easy')">Easy</button>
-  <button disabled>Medium</button>
-  <button disabled>Hard</button>
-  <button disabled>Extreme</button>
-  <button disabled>Nightmare</button>
 </div>
 
-<!-- HUD and buttons -->
 <p id="hud" style="display:none;"></p>
+
 <div class="buttons" style="display:none;">
   <button id="upgradeBtn" onclick="buyUpgrade()">Upgrade Damage</button>
-  <button id="sideShipBtn" onclick="buySideShip()">Buy Side Ship</button>
-  <button id="incomeBtn" onclick="buyIncome()">Double Income</button>
-  <button id="laserBtn" onclick="buyLaser()">Buy Laser</button>
-  <button id="skipBtn" onclick="skipWave()">Skip Wave</button>
+  <button onclick="skipWave()">Skip Wave</button>
 </div>
 
-<!-- Game Canvas -->
 <canvas id="game" width="600" height="400" style="display:none;"></canvas>
 
+<div id="leaderboard" style="display:none;">
+  <h2>🏆 Easy Dungeon Leaderboard</h2>
+  <ol id="leaderboardList"></ol>
+</div>
+
 <script>
-// ------------------ Game Variables ------------------
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const hud = document.getElementById("hud");
 
-let coins = 0, incomeMult = 1, incomeCost = 50;
-let damage = 1, upgradeCost = 10, damageUpgradesBought = 0;
-
+let coins = 0;
+let damage = 1;
+let upgradeCost = 10;
 let wave = 1;
 const maxWaves = 15;
-
-let hearts = 5, maxHearts = 5;
+let hearts = 5;
+const maxHearts = 5;
 
 const player = { x:280, y:350, width:40, height:20, speed:4 };
-let keys = {}, shooting = false;
+let keys = {};
+let shooting = false;
 
-let sideShips = [], bullets = [], enemies = [], heartDrops = [];
+let bullets = [];
+let enemies = [];
 
 const baseEnemyHP = 3;
 const enemiesPerWave = 5;
 
-// Dungeon timer in frames (3 mins = 180s * 60fps)
-let dungeonTimer = 10800;
+let dungeonStartTime = 0;
+let dungeonName = "";
 
-// ------------------ Controls ------------------
-document.addEventListener("keydown", e => { keys[e.key.toLowerCase()] = true; if(e.code==="Space") shooting=true; });
-document.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; if(e.code==="Space") shooting=false; });
+// Controls
+document.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if(e.code==="Space") shooting=true;
+});
+document.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+  if(e.code==="Space") shooting=false;
+});
 
-// ------------------ Shooting ------------------
+// Shooting
 setInterval(()=>{
   if(!shooting) return;
   bullets.push({x:player.x+18,y:player.y});
-  sideShips.forEach(s => bullets.push({x:s.x+10,y:s.y}));
 },120);
 
-// ------------------ Enemy Spawning ------------------
+// Spawning
 function spawnWave() {
   enemies = [];
   if(wave > maxWaves) return;
-  coins += 20;
 
-  if(wave === maxWaves){ // Boss
+  if(wave === maxWaves){
     enemies.push({
       x: 200, y: -50, width:120, height:50,
       hp: baseEnemyHP*12, type:"boss", speed:0.3
@@ -93,152 +112,180 @@ function spawnWave() {
   }
 
   for(let i=0;i<enemiesPerWave+wave;i++){
-    let type="normal", hp=baseEnemyHP;
-    if(wave>=10 && Math.random()<0.25){ type="ultra"; hp*=4; }
-    else if(wave>=5 && Math.random()<0.35){ type="super"; hp*=2; }
-    enemies.push({ x:Math.random()*(canvas.width-30), y:-Math.random()*200, width:30, height:20, hp, type, speed:0.6 });
+    enemies.push({
+      x:Math.random()*(canvas.width-30),
+      y:-Math.random()*200,
+      width:30,
+      height:20,
+      hp: baseEnemyHP,
+      speed:0.6
+    });
   }
 }
 
-// ------------------ Player Movement ------------------
 function movePlayer(){
   if(keys["a"]) player.x-=player.speed;
   if(keys["d"]) player.x+=player.speed;
   if(keys["w"]) player.y-=player.speed;
   if(keys["s"]) player.y+=player.speed;
+
   player.x=Math.max(0,Math.min(canvas.width-player.width,player.x));
   player.y=Math.max(0,Math.min(canvas.height-player.height,player.y));
 }
 
-// ------------------ Skip Wave ------------------
 function skipWave(){
   if(enemies.length <= 2){
-    wave++; spawnWave();
-  } else { alert("You can only skip the wave when 2 or fewer enemies remain!"); }
-}
-
-// ------------------ Return to Menu ------------------
-function returnToMenu(){
-  alert("Dungeon Over!");
-  document.querySelectorAll(".buttons, #hud").forEach(el=>el.style.display="none");
-  canvas.style.display="none";
-  spawnScreen.style.display="block";
-  resetGame();
-}
-
-// ------------------ Reset Game ------------------
-function resetGame(){
-  coins=0; incomeMult=1; incomeCost=50;
-  damage=1; upgradeCost=10; damageUpgradesBought=0;
-  hearts=maxHearts;
-  wave=1; dungeonTimer=10800;
-  bullets=[]; enemies=[]; heartDrops=[]; sideShips=[];
-}
-
-// ------------------ Upgrades ------------------
-function buyUpgrade(){
-  if(coins>=upgradeCost){
-    coins-=upgradeCost; damage++; damageUpgradesBought++;
-    if(damageUpgradesBought>5) upgradeCost*=4;
-    else upgradeCost=Math.floor(upgradeCost*3.5);
+    wave++;
+    spawnWave();
   }
 }
-function buySideShip(){
-  if(coins>=50 && sideShips.length<2){ coins-=50; sideShips.push({x:0,y:0}); }
-  else if(sideShips.length>=2){ alert("Max 2 side ships!"); }
-}
-function buyIncome(){ if(coins>=incomeCost){ coins-=incomeCost; incomeMult*=2; incomeCost*=3; } }
-function buyLaser(){ if(coins>=300){ coins-=300; alert("Laser coming soon!"); } }
 
-// ------------------ Spawn/Dungeon Screens ------------------
-const spawnScreen = document.getElementById("spawnScreen");
-const dungeonScreen = document.getElementById("dungeonScreen");
-const gameCanvas = document.getElementById("game");
-
-document.querySelectorAll(".buttons, #hud").forEach(el=>el.style.display="none");
-gameCanvas.style.display="none";
-
-function openRealm(realmNumber){
-  spawnScreen.style.display="none"; dungeonScreen.style.display="block";
-}
-
-function startDungeon(dungeonName){
-  dungeonScreen.style.display="none"; gameCanvas.style.display="block";
-  document.querySelectorAll(".buttons, #hud").forEach(el=>el.style.display="block");
-  resetGame(); spawnWave();
-}
-
-// ------------------ Game Loop ------------------
 function update(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   movePlayer();
 
-  // Player
-  ctx.fillStyle="cyan"; ctx.fillRect(player.x,player.y,player.width,player.height);
+  ctx.fillStyle="cyan";
+  ctx.fillRect(player.x,player.y,player.width,player.height);
 
-  // Side Ships
-  sideShips.forEach((s,i)=>{
-    s.x=player.x+(i%2===0?-50:50); s.y=player.y;
-    ctx.fillStyle="lightblue"; ctx.fillRect(s.x,s.y,20,15);
+  ctx.fillStyle="yellow";
+  bullets.forEach((b,i)=>{
+    b.y-=6;
+    ctx.fillRect(b.x,b.y,4,10);
+    if(b.y<0) bullets.splice(i,1);
   });
 
-  // Bullets
-  ctx.fillStyle="yellow";
-  bullets.forEach((b,i)=>{ b.y-=6; ctx.fillRect(b.x,b.y,4,10); if(b.y<0) bullets.splice(i,1); });
-
-  // Enemies
   enemies.forEach((e,i)=>{
     e.y+=e.speed;
-    ctx.fillStyle = e.type==="boss"?"red":e.type==="ultra"?"purple":e.type==="super"?"orange":"pink";
+    ctx.fillStyle = e.type==="boss"?"red":"pink";
     ctx.fillRect(e.x,e.y,e.width,e.height);
-    if(e.y>canvas.height){ enemies.splice(i,1); hearts--; if(hearts<=0){ alert("Game Over!"); location.reload(); } }
+
+    if(e.y>canvas.height){
+      enemies.splice(i,1);
+      hearts--;
+      if(hearts<=0){
+        alert("Game Over!");
+        location.reload();
+      }
+    }
   });
 
-  // Bullet collisions
   bullets.forEach((b,bi)=>{
     enemies.forEach((e,ei)=>{
       if(b.x<e.x+e.width && b.x+4>e.x && b.y<e.y+e.height && b.y+10>e.y){
-        e.hp-=damage; bullets.splice(bi,1);
-        if(e.hp<=0){ if(Math.random()<0.05){ heartDrops.push({x:e.x,y:e.y,size:15}); } enemies.splice(ei,1); coins+=1*incomeMult; }
+        e.hp-=damage;
+        bullets.splice(bi,1);
+        if(e.hp<=0){
+          enemies.splice(ei,1);
+          coins++;
+        }
       }
     });
   });
 
-  // Heart drops
-  heartDrops.forEach((h,i)=>{
-    h.y+=1; ctx.fillStyle="red"; ctx.fillRect(h.x,h.y,h.size,h.size);
-    if(h.x<player.x+player.width && h.x+h.size>player.x && h.y<player.y+player.height && h.y+h.size>player.y){
-      if(hearts<maxHearts) hearts++; heartDrops.splice(i,1);
+  if(enemies.length===0){
+    wave++;
+    if(wave > maxWaves){
+      finishDungeon();
+      return;
     }
-  });
+    spawnWave();
+  }
 
-  // Dungeon timer
-  dungeonTimer--;
-  if(dungeonTimer<=0){ returnToMenu(); }
-
-  // Spawn next wave if current cleared
-  if(enemies.length===0 && wave<=maxWaves){ wave++; spawnWave(); }
-
-  // HUD
   hud.innerText = `
 Coins: ${coins}
 Wave: ${wave}/${maxWaves}
 Damage: ${damage}
-Side Ships: ${sideShips.length}
 Hearts: ${"❤️".repeat(hearts)}
-Dungeon Time: ${Math.floor(dungeonTimer/60)}s
 `;
 
-  // Button costs
   document.getElementById("upgradeBtn").innerText = `Upgrade Damage (${upgradeCost})`;
-  document.getElementById("sideShipBtn").innerText = `Buy Side Ship (50)`;
-  document.getElementById("incomeBtn").innerText = `Double Income (${incomeCost})`;
-  document.getElementById("laserBtn").innerText = `Buy Laser (300)`;
 
   requestAnimationFrame(update);
 }
 
-spawnWave(); update();
+// Leaderboard
+function saveLeaderboard(name, time){
+  let scores = JSON.parse(localStorage.getItem("easyLeaderboard")) || [];
+  scores.push({ name, time });
+  scores.sort((a,b)=>a.time-b.time);
+  scores = scores.slice(0,5);
+  localStorage.setItem("easyLeaderboard", JSON.stringify(scores));
+}
+
+function showLeaderboard(){
+  const board = document.getElementById("leaderboard");
+  const list = document.getElementById("leaderboardList");
+  list.innerHTML = "";
+
+  let scores = JSON.parse(localStorage.getItem("easyLeaderboard")) || [];
+
+  scores.forEach(s=>{
+    const li = document.createElement("li");
+    li.textContent = `${s.name} - ${s.time}s`;
+    list.appendChild(li);
+  });
+
+  board.style.display = "block";
+}
+
+function finishDungeon(){
+  if(dungeonName === "Easy"){
+    const timeTaken = Math.floor((Date.now() - dungeonStartTime) / 1000);
+    const name = prompt("You beat Easy! Enter your name:");
+    if(name) saveLeaderboard(name, timeTaken);
+  }
+
+  alert("Dungeon Completed!");
+  showLeaderboard();
+
+  canvas.style.display="none";
+  hud.style.display="none";
+  document.querySelector(".buttons").style.display="none";
+  document.getElementById("spawnScreen").style.display="block";
+
+  resetGame();
+}
+
+function resetGame(){
+  coins = 0;
+  damage = 1;
+  upgradeCost = 10;
+  wave = 1;
+  hearts = maxHearts;
+  bullets = [];
+  enemies = [];
+}
+
+function buyUpgrade(){
+  if(coins>=upgradeCost){
+    coins-=upgradeCost;
+    damage++;
+    upgradeCost=Math.floor(upgradeCost*2.5);
+  }
+}
+
+const spawnScreen = document.getElementById("spawnScreen");
+const dungeonScreen = document.getElementById("dungeonScreen");
+
+function openRealm(){
+  spawnScreen.style.display="none";
+  dungeonScreen.style.display="block";
+}
+
+function startDungeon(name){
+  dungeonName = name;
+  dungeonStartTime = Date.now();
+
+  dungeonScreen.style.display="none";
+  canvas.style.display="block";
+  hud.style.display="block";
+  document.querySelector(".buttons").style.display="block";
+
+  resetGame();
+  spawnWave();
+}
+
+update();
 </script>
 </body>
 </html>
